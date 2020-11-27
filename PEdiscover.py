@@ -1,5 +1,5 @@
+#!/usr/bin/python3
 import pefile
-from capstone import *
 from typing import Dict, Any, Union
 from inits import *
 from parser import *
@@ -7,38 +7,31 @@ import sys
 import os
 import math
 
+info_list = info_set()
 
-newinit = dicts()
-
-
-def ShowFile():
-    NOS = pe.FILE_HEADER.NumberOfSections
-    print "Number of section is:", NOS
+def show_file_magic():
+    num_of_sections = pe.FILE_HEADER.NumberOfSections
+    print("Number of section:", num_of_sections)
     machine = hex(pe.FILE_HEADER.Machine)
-    print "Machine for this PE is: " + newinit.machinedict[machine]
-def ShowOptional():
-    ImageBase = hex(int(pe.OPTIONAL_HEADER.ImageBase))
-    print "Image base of PE is: " + ImageBase
-    entrypoint = pe.OPTIONAL_HEADER.AddressOfEntryPoint
-    EntryPoint_Address = hex(entrypoint+pe.OPTIONAL_HEADER.ImageBase)
-    print "Entry point address is: " + EntryPoint_Address
-    BaseOfCode = hex(pe.OPTIONAL_HEADER.BaseOfCode + pe.OPTIONAL_HEADER.ImageBase)
-    BaseOfData = hex(pe.OPTIONAL_HEADER.BaseOfData + pe.OPTIONAL_HEADER.ImageBase)
-    print "Base of code address is: " + BaseOfCode
-    print "Base of data address is: " + BaseOfData
-    reservedstack = pe.OPTIONAL_HEADER.SizeOfStackReserve
-    commitstack = pe.OPTIONAL_HEADER.SizeOfStackCommit
+    print("Machine for this PE: " + info_list.machinedict[machine])
 
-    reservedheap = pe.OPTIONAL_HEADER.SizeOfHeapReserve
-    commitheap = pe.OPTIONAL_HEADER.SizeOfHeapCommit
+def show_optional_header():
+    image_base = hex(int(pe.OPTIONAL_HEADER.image_base))
+    print("Image base of PE: " + image_base)
+    EntryPoint_Address = hex(pe.OPTIONAL_HEADER.AddressOfEntryPoint + pe.OPTIONAL_HEADER.image_base)
+    print("Entry point address: " + EntryPoint_Address)
 
-    HeapFreeSpace = hex(reservedheap - commitheap)
-    StackFreeSpace = hex(reservedstack - commitstack)
-    print "Free space on the stack is: " + StackFreeSpace
-    print "Free space on the heap is: " + HeapFreeSpace
+    base_of_code = hex(pe.OPTIONAL_HEADER.base_of_code + pe.OPTIONAL_HEADER.image_base)
+    base_of_data = hex(pe.OPTIONAL_HEADER.base_of_data + pe.OPTIONAL_HEADER.image_base)
+    print("Base of code section: " + base_of_code)
+    print("Base of data section: " + base_of_data)
 
-    subs = pe.OPTIONAL_HEADER.Subsystem
-    print "PE subsystem is:", newinit.subsdict[subs]
+    heap_free_space = hex(pe.OPTIONAL_HEADER.SizeOfStackCommit - pe.OPTIONAL_HEADER.SizeOfStackReserve)
+    stack_free_space = hex(pe.OPTIONAL_HEADER.SizeOfStackReserve - pe.OPTIONAL_HEADER.SizeOfStackCommit)
+    print("Free stack space : " + stack_free_space)
+    print("Free heap space: " + heap_free_space)
+
+    print("PE subsystem:", info_list.subsdict[pe.OPTIONAL_HEADER.Subsystem])
 
     DllCharacteristics = int(pe.OPTIONAL_HEADER.DllCharacteristics)
     dllchar1 = DllCharacteristics // 0x1000
@@ -46,53 +39,42 @@ def ShowOptional():
     dllchar2 = DllCharacteristics // 0x100
     DllCharacteristics %= 0x100
     dllchar3 = DllCharacteristics // 0x10
+    print ("DLL charachteristics: " + info_list.dllchar1dict[dllchar1] + " " + info_list.dllchar2dict[dllchar2] + " " + info_list.dllchar3dict[dllchar3])
 
-    print "DLL charachteristics: " + newinit.dllchar1dict[dllchar1] + " " + newinit.dllchar2dict[dllchar2] + " " + newinit.dllchar3dict[dllchar3]
-def ShowIat():
+def show_import_table():
     pe.parse_data_directories()
-    print "Import table containment:"
+    print("Import table containment:")
     for entry in pe.DIRECTORY_ENTRY_IMPORT:
-        print entry.dll
+        print(entry.dll)
         for imp in entry.imports:
-            print '\t', hex(imp.address), imp.name
-def GetHex():
+            print('\t', hex(imp.address), imp.name)
+
+def get_hex_dump():
     file = args.filename
     bytelist = bytearray()
     with open(file, 'rb') as bytes:
         for byte in bytes:
             bytelist.extend(byte)
-    print ' '.join(format(x, '02x') for x in bytelist)
-def DisassFromStart():
-    entrypoint = pe.OPTIONAL_HEADER.AddressOfEntryPoint
-    EntryPoint_Address = entrypoint + pe.OPTIONAL_HEADER.ImageBase
-    binarycode = pe.get_memory_mapped_image()[entrypoint:entrypoint + args.ds]
-    disassembler = Cs(CS_ARCH_X86, CS_MODE_32)
-    for instr in disassembler.disasm(binarycode, EntryPoint_Address + args.ds):
-        print "%s\t%s" % (instr.mnemonic, instr.op_str)
-def DisassFromOffset():
-    entrypoint = pe.OPTIONAL_HEADER.AddressOfEntryPoint
-    EntryPoint_Address = entrypoint + pe.OPTIONAL_HEADER.ImageBase
-    binarycode = pe.get_memory_mapped_image()[entrypoint + args.do:entrypoint + args.do + args.o]
-    disassembler = Cs(CS_ARCH_X86, CS_MODE_32)
-    for instr in disassembler.disasm(binarycode, EntryPoint_Address+args.o):
-        print "%s\t%s" % (instr.mnemonic, instr.op_str)
+    nl = 0
+    byte_str = str()
+    for byte in bytelist:
+        byte_str += " {}" .format(hex(byte))
+        nl+=1
+        if nl == 16:
+            print(byte_str)
+            byte_str = ''
+            nl = 0
 
+if __name__ == "__main__":
+    parser = CreateParser()
+    args = parser.parse_args()
+    pe = pefile.PE(args.filename)
 
-
-newparser = pars()
-parser = pars.CreateParser(newparser)
-args = parser.parse_args()
-pe = pefile.PE(args.filename)
-
-if args.fd:
-    ShowFile()
-if args.od:
-    ShowOptional()
-if args.i:
-    ShowIat()
-if args.x:
-    GetHex()
-if args.ds:
-    DisassFromStart()
-if args.do and args.o:
-    DisassFromOffset()
+    if args.fd:
+        show_file_magic()
+    if args.od:
+        show_optional_header()
+    if args.i:
+        show_import_table()
+    if args.x:
+        get_hex_dump()

@@ -1,4 +1,5 @@
-class dicts(object):
+class info_set():
+    
     def __init__(self):
         self.subsdict ={0:"Unknown subsystem.", 1:"No subsystem required (device drivers and native system processes).",3:"Windows character-mode user interface (CUI) subsystem.",
            5:"OS/2 CUI subsystem.",7:"POSIX CUI subsystem.",9:"Windows CE system.",10:"Extensible Firmware Interface (EFI) application.", 11:"EFI driver with boot services.",
